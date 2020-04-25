@@ -2,6 +2,9 @@
 
 java-oauth2 initial should be the same as java-usermodel - expections and logging
 
+### server.port
+* Default port 8080, otherwise defined in resources/application.properties.
+
 ### Logging
 * Under Spring boot, slf4j and LogBack are treated the same. 
 * Include slf4j as dependency in pom.xml, a file logback-spring.xml can be created to control loggging output to files and console.
