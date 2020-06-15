@@ -259,14 +259,3 @@ In the OAuth2 framework, 4 Roles are identified.
 ### Security is in place
 > Thanks to the behind the scenes work of Spring Security, enabling OAuth2 security in Java Spring is simply adding a series of boilerplate code and configuring it to fit our application. We now have user authentication in place! We will see how to access this in the objective covering using Postman with User Authentication!
 
-## JSON Web Token (JWT) vs Oauth2
-> Unlike JSON Web Tokens (JWT), no information is included with the authentication token sent to the client. Security is the reason for this. If the token is intercepted during transmission, the interceptor just has the token and no additional information. In order to get additional information, the interceptor would have to query API Backend system, meaning they would have to be able to connect to the system - CORS and client access would have to be configured just right to let this happen.
-
-* Positive is increased security
-* Negative is increased web traffic and complexity for the client application
-
-* You can determine the name of the user associated with the given authentication token using a variety of methods
-Referencing the global class SecurityContextHolder
-
-![UserServiceImplement Authentication](./UserServiceImpl_authentication.png)
-
