@@ -276,3 +276,241 @@ In the OAuth2 framework, 4 Roles are identified.
 ### Security is in place
 > Thanks to the behind the scenes work of Spring Security, enabling OAuth2 security in Java Spring is simply adding a series of boilerplate code and configuring it to fit our application. We now have user authentication in place! We will see how to access this in the objective covering using Postman with User Authentication!
 
+
+## CORS - Cross-Origin Resource Sharing
+> We are using the same computer, as our frontend client - think Postman, as the one where our API backend system resides. Same computer, same domain, same “origin”. Soon we will be deploying our API to the cloud. Ultimately this is what we are after, making our API available to others. When we deploy, the client accessing our API and our API backend will most likely be on different computers, different domains, different “origin”. We need to allow different origins to share, use the resources of our API backend. By default only clients and backends running on the same system can access each other. We need to allow Cross-Origin Resource Sharing, normally called CORS.
+
+> We allow CORS, also referred to as preventing CORS errors, we can specific
+
+* Which origins, domains can access our API.
+    - Normally we will allow all origins to access our API. This is certainly true of all publicly facing APIs. For company internal APIs, you may wish to restrict which origins can access the API to only those within the company
+* Which HTTP Methods will be allowed
+* Which Access Control Headers will be allowed
+
+> We are going to allow all origins using any HTTP Methods and using any Access Control Headers. We do this by taking advantage of the Spring Filter Chain which filters who has access to what on our API.
+
+```java
+import org.springframework.core.Ordered;
+import org.springframework.core.annotation.Order;
+import org.springframework.http.HttpMethod;
+import org.springframework.stereotype.Component;
+
+import javax.servlet.Filter;
+import javax.servlet.FilterChain;
+import javax.servlet.ServletException;
+import javax.servlet.ServletRequest;
+import javax.servlet.ServletResponse;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+import java.io.IOException;
+
+/**
+ * Spring uses filters to manage web traffic. Here we manually add a CORS (Cross-Origin Resource Sharing) filter to the chain.
+ * Using the Order annotation, we tell Spring this is the most important filter. If this filter blocks a request,
+ * don't do anything else. Just block the request.
+ */
+@Component
+@Order(Ordered.HIGHEST_PRECEDENCE)
+public class SimpleCorsFilter
+    implements Filter
+{
+    @Override
+    public void doFilter(
+        ServletRequest servletRequest,
+        ServletResponse servletResponse,
+        FilterChain filterChain) throws
+                                 IOException,
+                                 ServletException
+    {
+        // Convert our request and response to Http ones. If they are not Http ones, an exception would be thrown
+        // that would handled by our exception handler!
+        HttpServletResponse response = (HttpServletResponse) servletResponse;
+        HttpServletRequest request = (HttpServletRequest) servletRequest;
+
+        // white list domains that can access this API. * says let everyone access it. To restrict access use something like
+        //                 response.setHeader("Access-Control-Allow-Origin",
+        //            "https://lambdaschool.com/");
+        response.setHeader("Access-Control-Allow-Origin",
+            "*");
+
+        // white list http methods that can be used with this API. * says lets them all work! To restrict access use something like
+        //        response.setHeader("Access-Control-Allow-Methods", "POST, PUT, GET, OPTIONS, DELETE");
+        response.setHeader("Access-Control-Allow-Methods",
+            "*");
+
+        // while list access headers that can be used with this API. * says lets them all work! To restrict access use something like
+        //        response.setHeader("Access-Control-Allow-Headers", "x-requested-with, authorization, content-type, access_token");
+        response.setHeader("Access-Control-Allow-Headers",
+            "*");
+
+        // maximum seconds results can be cached
+        response.setHeader("Access-Control-Max-Age",
+            "3600");
+
+        if (HttpMethod.OPTIONS.name()
+            .equalsIgnoreCase(request.getMethod()))
+        {
+            response.setStatus(HttpServletResponse.SC_OK);
+        } else
+        {
+            filterChain.doFilter(servletRequest,
+                servletResponse);
+        }
+    }
+}
+```
+> That is it. You now have CORS in place. I add this filtering class to every one of my API applications. This code allows all domains to access anything. Restrictions on who can access what are handled by the OAuth2 process. Comments are included how to go about restricting origins, HTTP Methods, and Access Control Headers.
+
+## Two Special cases of User Authentication
+> Two special cases arise with user authentication. How does someone create their own user account and sign on all in one step? How does a user logout of the system? Let’s work through each of these scenarios and then code them!
+
+* Creating their own account - Often websites contain an option for users to create their own accounts. This gives the user immediate access but with predefined access. Here is our plan:
+    - The user will give us minimal information: name and password.
+    - The system will create an account for that user assuming one is not already created. The user will be assigned to the USER role.
+    - Within the same method, we will call the login endpoint that assigns access tokens.
+    - We will let the system assign an access token.
+    - Finally, we will return that access token.
+* Logging out - when a user no longer wishes to maintain access to the system, they can logout. To logout we remove the access token from the token store. If the access token is no longer available, it is no longer valid, and thus the user no longer has access. The access token we remove will be the one the authenticated user sends us when they access the logout endpoint. Let’s see how these look in code.
+
+### Create A New User
+> We need to expose the findByName(String name) method in the role repository. The role repository should now look like this:
+```java
+public interface RoleRepository
+        extends CrudRepository<Role, Long>
+{
+    Role findByName(String name);
+}
+```
+> We need a special user model to work with our incoming data. So under the subpackage models, create the class UserMinimum. This model does NOT get saved in the database and is only to get the user information in from the client for this endpoint. Specifically by using this model we receive our password in plain text which we will need to get an access token. Add the following code to the UserMinimum class.
+
+```java
+public class UserMinimum
+{
+    private String username;
+    private String password;
+
+    public String getUsername()
+    {
+        return username;
+    }
+
+    public void setUsername(String username)
+    {
+        this.username = username;
+    }
+
+    public String getPassword()
+    {
+        return password;
+    }
+
+    public void setPassword(String password)
+    {
+        this.password = password;
+    }
+}
+```
+> Under the controllers subpackage add a class called Oauthendpoints. Let’s build this class.
+
+> The class is to be a RestController. So add the @RestController annotation.
+> Inside the body of the class, connect the class to the user and role repositories. Note: the TokenStore is needed for the logout method later in this objective. We should just add it now though!
+```java
+@RestController
+public class Oauthendpoints
+{
+@Autowired
+    RoleRepository rolerepos;
+
+    @Autowired
+    UserRepository userrepos;
+
+    @Autowired
+    private TokenStore tokenStore;
+    
+     @PostMapping(value = "/createnewuser",
+        consumes = {"application/json"},
+        produces = {"application/json"})
+    public ResponseEntity<?> addSelf(
+            HttpServletRequest httpServletRequest,
+            @RequestBody UserMinimum newinuser)
+    {
+    //isBlank() returns true if all that is in a String are whitespace characters.
+        if (newinuser.getUsername().isBlank() || newinuser.getPassword().isBlank())
+        {
+            throw new EntityNotFoundException("Username and / or password cannot be blank");
+        }
+
+        if (userrepos.findByUsername(newinuser.getUsername()) != null)
+        {
+            throw new EntityExistsException("Username already exists");
+        }
+        
+        User newuser = new User();
+        newuser.setUsername(newinuser.getUsername());
+        newuser.setPassword(newinuser.getPassword());
+        newuser.addRole(rolerepos.findByName("USER"));
+        newuser = userrepos.save(newuser);
+        
+        HttpHeaders responseHeaders = new HttpHeaders();
+        URI newUserURI = ServletUriComponentsBuilder.fromUriString(httpServletRequest.getServerName() + ":" + httpServletRequest.getLocalPort() + "/users/user/{userId}")
+            .buildAndExpand(newuser.getUserid())
+            .toUri();
+        responseHeaders.setLocation(newUserURI);
+        
+    }
+}
+```
+> Now let’s get an access token. To get the access token we are going to act like an API client and call the endpoint that authenticates users. We set up the endpoint using a RestTemplate, invoke the endpoint, and return the access token!
+
+> You can try out the new endpoint by going to the endpoint http://localhost:2019/createnewuser using the following request body
+```java
+{
+    "username": "stumps",
+    "password": "ILuvM4th!"
+}
+```
+> The user stumps will be created with a role of USER. stumps’ access token will be returned with a status of CREATED.
+
+### Logout a user
+> To logout a user, a user will access the /logout endpoint using their access token. We will find the access token in the token store and remove it. Create another method in the **Oauthendpoints** class using the following code.
+
+```java
+@GetMapping(value = "/logout")
+    public ResponseEntity<?> logoutSelf(HttpServletRequest request)
+    {
+     String authHeader = request.getHeader("Authorization");
+        if (authHeader != null)
+        {
+            // find the token
+            String tokenValue = authHeader.replace("Bearer",
+                "")
+                .trim();
+            // and remove it!
+            OAuth2AccessToken accessToken = tokenStore.readAccessToken(tokenValue);
+            tokenStore.removeAccessToken(accessToken);
+        }
+
+        return new ResponseEntity<>(HttpStatus.OK);
+    }
+    
+```
+> To test this, sign on as any user. Use that users access token to go to the endpoint http://localhost:2019/logout. Now try to access a secured endpoint with that access token. You will get an invalid access token error message! The user is no longer authenticated to the application!
+
+### Postman
+> Using Postman as our client to access Oauth2 API backend.
+
+#### Postman not authenticated
+![Postman unAuthenticated](./postman_notauthenticated.png)
+
+#### Oauth2 Authorization
+![Oauth2 Authorization](./oauth2_authorization.png)
+
+#### GetAccess Token
+![Get Access Token](./getAccessToken.png)
+
+#### New Access Token Window
+![New Access Token window](./newAccessTokenWindow.png)
+
+
+
+
