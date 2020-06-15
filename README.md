@@ -189,7 +189,24 @@ In the OAuth2 framework, 4 Roles are identified.
 ### Necessary Services
 > We are going to keep our boilerplate simple and access the models through the repositories, bypassing services. This is for our example only. In a production system, USE SERVICES!!! However, Spring Security relies on a service that connects it to our User, Role models. From the boilerplate code, add the service SecurityUserServiceImpl.
 
+![UserServiceImpl authentication](./UserServiceImpl_authentication.png)
+
 > Now that we have real user id, we need to update the UserAuditing service to use those user ids! Put the updated version of UserAuditing from the boilerplate code into your application.
+
+### Json Web Token (JWT) vs Oauth2
+> Unlike JSON Web Tokens (JWT), no information is included with the authentication token sent to the client. Security is the reason for this. If the token is intercepted during transmission, the interceptor just has the token and no additional information. In order to get additional information, the interceptor would have to query API Backend system, meaning they would have to be able to connect to the system - CORS and client access would have to be configured just right to let this happen.
+
+* Positive is increased security
+* Negative is increased web traffic and complexity for the client application
+
+> You can determine the name of the user associated with the given authentication token using a variety of methods
+    - Referencing the global class SecurityContextHolder
+
+* From the global Authentication class, you can call the method getPrincipal() to learn a variety of information about the user and their authorities
+
+* From the global Authentication class, you can call the method getName() to return the username. You can then call UserService.findByName() with that name as the parameter and return the entire user record associated with that authentication token.
+
+![UserController getPrincipal](./UserController_getPrincipal.png)
 
 ### Configuration
 > Now for the part totally new related to Security. We are going to configure our web security, enable our authorization server, and enable our resource server.
