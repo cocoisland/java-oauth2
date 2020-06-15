@@ -69,6 +69,9 @@ In the OAuth2 framework, 4 Roles are identified.
 > Adding a new user is the same as adding any other record to our database. The one additional item is that the password has to be encrypted. Although not required, encrypting the password is definitely the preferred practice! We use an encryption algorithm called BCrypt. This is fairly standard in the industry.
 
 > We say which algorithm we are going to use in the SecurityConfig class. This is where we setup the Bean for PasswordEncoder in SecurityConfig class.
+![SecurityConfig Encoder](./SecurityConf_Encoder.png)
+
+![User Setpassword](./User_Setpasswd.png)
 
 ### Authorizing the client
 > The step in using the API Backend is to Authorize the client, the application wanting to use the API. The client has a special username and password needed to access the backend. They also have special names.
@@ -84,5 +87,62 @@ In the OAuth2 framework, 4 Roles are identified.
 * Note that the client secret is also encrypted using BCrypt, using our encode Bean from the SecurityConfig class.
 * Other configurations happen in the AuthorizationServerConfig like how long a token is valid.
 
-![AuthorizationServerConfig](./AuthServConfig.png)
+![AuthorizationServerConfig secret access](./AuthServConfig.png)
+
+* We also set what the login endpoint from where a user, not to be confused with the client, gets their authentication token.
+    - Client is the fontend system accessing the API Backend
+    - User is the person, usually, actually handling data from the Backend.
+    
+ ![AuthorizationServerConfig endpoint](./AuthServConf_endpt.png)
+ 
+### Authenticating the user
+> In most REST API calls from a client, the Authorization and Authentication are handled in a single request. The client just sends the client id and client secret along with a username and password to the API Backend System. That API Backend System takes care of Authorizing the client and then Authenticated the user!
+
+> Authenticating a user happens after the client is Authorized. The client must have access to the API Backend System via its client id and client secret before it can request an Authentication token for a user.
+
+> The process of Authentication is taking a username and password and determining if that combination is a valid combination, represents a valid user, of the system. If the validity of the user is confirmed, the API Backend System returns to the client an Authentication Token. It is this token that will identify the user in future requests.
+
+> That Authentication Token is store in the Token Store. You can think of a Token Store as a table in memory with columns contains data such as
+
+* The Authentication Token
+* The time the token is to expire
+* The Authentication object of the user, the UserDetails Security Object which is essentially a cached copy of the user record only containing data necessary for security.
+* The Token Store Bean is set up in the SecurityConfig class and configured as the Authentication Manager in the AuthorizationServerConfig
+
+![SecurityConfig token](./SecurityConf_TokenStore.png)
+
+![AuthServConfig authentication](./AuthServConf_AuthenticationManager.png)
+
+### Using the authentication token
+> Note that we restrict what user can do what with our data through user roles. Users get access to read, manipulate certain pieces of data by what role they are assigned. Role assignment are often done by type of user: admin, dataentry, user. Sometimes departments are added: systemadim, accountingadmin, hrdataentry, manufacturinguser. The name of the role can be anything but is usually something that makes sense to a human reading the role title. Role titles do get hard coded in our applications when we are restricting data to certain roles. So name roles carefully as changing the name of role is a BIG deal!
+
+> Now we have an authentication token that identifies that this is a valid user and identifies which user it is. From this authentication token we can also identify what can access.
+
+> To access a restricted endpoint, the client send an authentication token in the Authorization header.
+
+> Spring Framework looks for that authentication token in the TokenStore
+
+* If Spring Security finds the token in the TokenStore
+    - Spring Security sees if the user associated with this token has access to the requested endpoint.
+       - This is handled through the getAuthority method in the User model
+       - This method returns which “Authorities” the user has been granted. In our case, those authorities are equivalent to our roles.
+
+![User getAuthority](./User_GetAuthority.png)
+
+* If Spring Security does not find the token in the TokenStore, an unauthorized status is returned.
+
+* To determine which roles has access to what endpoints, the first place to check is the ResourceServerConfig. This class determines which roles have access to which resources, or endpoints. The majority of your security configuration happens in this class.
+
+![ResourceServerConfig endpoint](./ResourceServerConfig_endpt.png)
+
+* You allow access to a resource using .antMatchers
+* The parameter for .antMatcher is a regular expression stating which endpoints you want to restrict.
+* The .antMatchers ends with a method
+    - .permitAll() - allows access to all. No Authentication Token is necessary
+    - .authenticated() - allows access to all authenticated users. A valid authentication token is required.
+    - .hasAnyRole() - the parameter is a list of roles who have access to these endpoints.
+* You can further restrict your security access using a @PreAuthorize annotation in the Controller. This further restrict access to this endpoint to only the given roles. Note: you cannot expand access via this method only further restrict it.
+
+![UserController PreAuthorization](./UserController_PreAuthorization.png)
+
 
