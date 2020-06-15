@@ -52,16 +52,16 @@ In the OAuth2 framework, 4 Roles are identified.
 
 ### Gaining Access
 > In order to request an access token, our client needs to know the client id and client secret. These will be provided to the client by the backend administrator. It is OUR responsibility to give the frontend the client id and client secret. The frontend client does not get to choose what these are, we do. Commonly you will see these being hard to guess random characters, normally 32 character hex strings. Sometimes you will see the client id and client security provided as Base64 API access tokens. A client would use either the client id / client security combination or the API access token to get authorized to the system. They do NOT use both. Which one they use is often left to the client to decide. The format of combining the client id and client secret is to take the following and encode it using Base64:
-```java
-client id:client secret
 
-Client id: 6779ef20e75817d76902 Client security: 9e51c1701e1a6f5cfb30780d94d38b8d API access token: Njc3OWVmMjBlNzU4MTdkNzY5MDI6OWU1MWMxNzAxZTFhNmY1Y2ZiMzA3ODBkOTRkMzhiOGQ=
-```
+* client id:client secret
 
-For our purposes we will use something easy to read. This will make reviewing each other’s code much easier.
-```java
-Client id: lambda-client Client security: lambda-secret API access token: bGFtYmRhLWNsaWVudDpsYW1iZGEtc2VjcmV0
-```
+* Client id: 6779ef20e75817d76902 Client security: 9e51c1701e1a6f5cfb30780d94d38b8d API access token: Njc3OWVmMjBlNzU4MTdkNzY5MDI6OWU1MWMxNzAxZTFhNmY1Y2ZiMzA3ODBkOTRkMzhiOGQ=
+
+
+> For our purposes we will use something easy to read. This will make reviewing each other’s code much easier.
+
+* Client id: lambda-client Client security: lambda-secret API access token: bGFtYmRhLWNsaWVudDpsYW1iZGEtc2VjcmV0
+
 
 ### Adding a new user
 > But before we can request access to the system, we need a user set up, you know, the one requesting access!
@@ -73,15 +73,16 @@ Client id: lambda-client Client security: lambda-secret API access token: bGFtYm
 ### Authorizing the client
 > The step in using the API Backend is to Authorize the client, the application wanting to use the API. The client has a special username and password needed to access the backend. They also have special names.
 
-username => client id
-password => client secret
-These are sent to the API backend via the Authorization header in a REST API request. They can either be sent as a username and password, or as is more common an API Key. The API Key is simply the string client id:client secret encoded using Base64.
+* username => client id
+* password => client secret
 
-The AuthorizationServerConfig class is responsible for handling the Authorization of the client.
+> These are sent to the API backend via the Authorization header in a REST API request. They can either be sent as a username and password, or as is more common an API Key. The API Key is simply the string client id:client secret encoded using Base64.
 
-In our case we list the client id and client secret directly in the AuthorizationServerConfig allowing for only one client id, client secret combination. Some systems provide access to multiple client ids but that is a more advanced topic.
-Note that the client secret is also encrypted using BCrypt, using our encode Bean from the SecurityConfig class.
-Other configurations happen in the AuthorizationServerConfig like how long a token is valid.
+> The AuthorizationServerConfig class is responsible for handling the Authorization of the client.
 
+* In our case we list the client id and client secret directly in the AuthorizationServerConfig allowing for only one client id, client secret combination. Some systems provide access to multiple client ids but that is a more advanced topic.
+* Note that the client secret is also encrypted using BCrypt, using our encode Bean from the SecurityConfig class.
+* Other configurations happen in the AuthorizationServerConfig like how long a token is valid.
 
+![AuthorizationServerConfig](./AuthServConfig.png)
 
