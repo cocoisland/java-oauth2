@@ -145,4 +145,116 @@ In the OAuth2 framework, 4 Roles are identified.
 
 ![UserController PreAuthorization](./UserController_PreAuthorization.png)
 
+## POM.XML
+> We need to tell our application that we will be using Spring Security. We do this by adding the appropriate dependencies to the POM.XML file. Once we add these dependencies to the POM.XML, we must implement security before we can run our application! So add the following dependencies to your POM.XML file. These dependencies can also be found in the security-boilerplate code directory
+```java
+ <!-- Security Dependencies Start -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-security</artifactId>
+        </dependency>
 
+        <dependency>
+            <groupId>org.springframework.security</groupId>
+            <artifactId>spring-security-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+
+        <dependency>
+            <groupId>org.springframework.security.oauth</groupId>
+            <artifactId>spring-security-oauth2</artifactId>
+            <version>2.3.6.RELEASE</version>
+        </dependency>
+        <!-- Security Dependencies End -->
+ ```
+ 
+### Necessary Models
+> Our application relies on user names - which could be a name, an email, user id - user passwords, and user roles. We need a place to store this information in our application. For the current sample application, we are going to use a separate users table. The user table would normally not only hold our user names and passwords but also anything else that is needed for a user of the system. In our case, combining the users model and the employee model into one table would make sense.
+
+> The roles will have a many-to-many relationship with users. A user can have multiple roles. A role should have multiple users.
+
+* Users
+    - In user we have a way to deal with passwords that are coming from the client not encrypted using the method setPassword(String password). When a password is internal to our system, it is encrypted. We can set an already encrypted password using the method setPasswordNoEncrypt(String password).
+    - Users have an additional getAuthority() method. This is the method Spring Security will use to determine which roles a user has.
+* Roles
+    - Always keep role names all upper case. Experience shows this will make your life easier!
+* UserRoles
+
+> And of course we need to add the necessary Repositories to connect these models to the rest of our application. Again inside the security-boilerplate code add the repositories for
+
+* UserRepository
+* RoleRepository
+    - We do not need one for UserRoles!
+
+### Necessary Services
+> We are going to keep our boilerplate simple and access the models through the repositories, bypassing services. This is for our example only. In a production system, USE SERVICES!!! However, Spring Security relies on a service that connects it to our User, Role models. From the boilerplate code, add the service SecurityUserServiceImpl.
+
+> Now that we have real user id, we need to update the UserAuditing service to use those user ids! Put the updated version of UserAuditing from the boilerplate code into your application.
+
+### Configuration
+> Now for the part totally new related to Security. We are going to configure our web security, enable our authorization server, and enable our resource server.
+
+> Work with web security first. Add the code from the boilerplate SecurityConfig to your application’s subpackage config. This configuration file
+
+* Enables are authentication manager allowing us to work with the user names and passwords
+* Connects Spring Security to the service SecurityUserServiceImpl and thus to our user and role tables
+* Creates an in memory table to store and maintain the access tokens for our systems. This acts as a separate in memory database. It is in memory for speed of access and so when the system goes down, all access is reset. Users have to sign in again after a system restart.
+* Defines the password encryption method we will use. Normally we will use the industry standard BCrypt as we do in this example.
+
+> Now let’s enable our Authorization Service. Add the code from the boilerplate AuthorizationServerConfig to your application’s subpackage config. This configuration file
+
+* Enables our authorization service using a client id and client secret it reads from the environment variables OAUTHCLIENTID and OAUTHCLIENTSECRET respectively.
+* We will set the access token to be valid forever. We can set the access token to become invalid after a certain time period forcing a user to sign in to our system again.
+* Besides using Roles, OAuth2 provides another layer of security rights called Scopes. We will not be addressing scopes in this module.
+* The grant type password tells the authorization server that we will be using the standard user name and password model to authenticate. Other methods exist but this one is by far the most common!
+* The default endpoint for requesting an access token in Spring Security is /oauth/token. We can easily change this to something like /login. The last method in the configuration class configure(AuthorizationServerEndpointsConfigurer endpoints) does this for us.
+
+> Finally, let’s enable our Resource Service. Add the code from the boilerplate ResourceServerConfig to your application’s subpackage config. The main purpose of this configuration class is to say which roles have access to which methods and endpoints, what are roles allowed to do. This is done through a series of antMatchers which are used to configure the authorized requests in our system. The boilerplate contains a simple series of .antMatchers. We have two Roles, ADMIN and USER. USER has access to all endpoints starting with /employees. ADMIN has access to all endpoints starting with /users. Anyone using the system (.permitAll()) can access /createnewuser. Anyone who has authenticated to the system can access /logout.
+
+> Note that in an antMatcher,
+* /users means just that endpoint
+* /users/** means the /users endpoint and anything below that. So for example
+    - /users
+    - /users/1
+    - /users/roles/add/me
+    
+> Below is a more complex that shows some of the power of how we control endpoints in our application. This is adapted from the guided project for this module.
+```java
+// our antMatchers control which roles of users have access to which endpoints
+        // we must order our antmatchers from most restrictive to least restrictive.
+        // So restrict at method level before restricting at endpoint level.
+        // permitAll = everyone and their brother
+        // authenticated = any authenticated, signed in, user
+        // hasAnyRole = must be authenticated and be assigned this role!
+        http.authorizeRequests()
+            .antMatchers("/",
+                "/h2-console/**",
+                "/swagger-resources/**",
+                "/swagger-resource/**",
+                "/swagger-ui.html",
+                "/v2/api-docs",
+                "/webjars/**",
+                "/createnewuser")
+            .permitAll()
+            .antMatchers(HttpMethod.POST, "/users/**")
+            .hasAnyRole("ADMIN")
+            .antMatchers(HttpMethod.DELETE, "/users/**")
+            .hasAnyRole("ADMIN")
+            .antMatchers(HttpMethod.PUT, "/users/**")
+            .hasAnyRole("ADMIN")
+            .antMatchers("/users/**",
+                "/useremails/**",
+                "/oauth/revoke-token",
+                "/logout")
+            .authenticated()
+            .antMatchers("/roles/**")
+            .hasAnyRole("ADMIN")
+            .and()
+            .exceptionHandling()
+            .accessDeniedHandler(new OAuth2AccessDeniedHandler());
+```
+
+> Note: they are called ant matcher from an old Apache Organization application called ant which was used for pattern matching. Ant = Another Neat Tool.
+
+### Security is in place
+> Thanks to the behind the scenes work of Spring Security, enabling OAuth2 security in Java Spring is simply adding a series of boilerplate code and configuring it to fit our application. We now have user authentication in place! We will see how to access this in the objective covering using Postman with User Authentication!
