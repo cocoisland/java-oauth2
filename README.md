@@ -93,7 +93,7 @@ In the OAuth2 framework, 4 Roles are identified.
     - Client is the fontend system accessing the API Backend
     - User is the person, usually, actually handling data from the Backend.
     
- ![AuthorizationServerConfig endpoint](./AuthServConf_endpt.png)
+ ![AuthorizationServerConfig endpoint](./AuthorizationServConf_endpt.png)
  
 ### Authenticating the user
 > In most REST API calls from a client, the Authorization and Authentication are handled in a single request. The client just sends the client id and client secret along with a username and password to the API Backend System. That API Backend System takes care of Authorizing the client and then Authenticated the user!
